@@ -1,5 +1,5 @@
 
-  module RF(   input         clk, 
+  module RF1(   input         clk, 
                input         rst,
                input         RFWr, 
                input  [4:0]  A1, A2, A3, 

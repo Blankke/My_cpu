@@ -1,6 +1,6 @@
 
 // data memory
-module dm(clk, DMWr, addr, din, dout);
+module dm1(clk, DMWr, addr, din, dout);
    input          clk;
    input          DMWr;
    input  [8:2]   addr;
