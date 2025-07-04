@@ -9,7 +9,7 @@ module alu1(A, B, ALUOp, C, Zero,PC);
    output Zero;
    
    reg [31:0] C;
-//   integer    i;
+   integer    i;
        
    always @( * ) begin
       case ( ALUOp )
