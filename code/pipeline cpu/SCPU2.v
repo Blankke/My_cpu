@@ -250,7 +250,9 @@ HazardDetectionUnit u_hazard (
     .PCWrite(PCWrite)
 );
 
-wire Branch_or_Jump = |NPCOp_EX;
+wire [2:0] NPCOp_Final = {NPCOp_EX[2], NPCOp_EX[1], NPCOp_EX[0] & Zero_EX}; //NPCOp的最终值
+
+wire Branch_or_Jump = |NPCOp_Final;
 assign id_ex_flush = stall_signal | Branch_or_Jump;
 assign if_id_pause = ~stall_signal;
 wire [1:0] ForwardA, ForwardB;
@@ -287,7 +289,7 @@ alu1 u_alu (
 NPC1 u_NPC (
     .PC(PC_out),
     .PC_EX(PC_EX),
-    .NPCOp(NPCOp_EX),
+    .NPCOp(NPCOp_Final),
     .IMM(immout_EX),
     .NPC(NPC),
     .PCWrite(PCWrite),
