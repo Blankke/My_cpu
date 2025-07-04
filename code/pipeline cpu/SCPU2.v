@@ -53,7 +53,7 @@ assign jimm={id_instr[31],id_instr[19:12],id_instr[20],id_instr[30:21]};
 
 
 //ID-Ex
-wire  id_ex_pause, id_ex_flush;
+wire   id_ex_flush;
 wire RegWrite;
 wire MemWrite;
 wire [4:0] ALUOp ;
@@ -90,7 +90,7 @@ wire [31:0] NPC;
 id_ex ID_EX(
     .clk(clk), 
     .rst(reset), 
-    .pause(id_ex_pause), 
+
     .flush(id_ex_flush),
     .id_RegWrite(RegWrite),
     .id_MemWrite(MemWrite),

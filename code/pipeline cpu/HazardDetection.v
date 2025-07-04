@@ -18,10 +18,10 @@ module HazardDetectionUnit(
             IF_ID_flush = 1'b0;
             PCWrite = 1'b0; // 阻塞时禁止PC更新
         end 
-        // 控制冒险检测（分支和跳转指令）
+        // 控制冒险检测
         else if (ID_EX_NPCOp != 3'b000) begin
             stall = 1'b0;
-            IF_ID_flush = 1'b1;  // 检测到控制冒险，冲刷 IF - ID 流水线寄存器
+            IF_ID_flush = 1'b1;  // 检测到控制冒险，flush IF - ID 流水线寄存器
             PCWrite = 1'b1; // 不阻塞时允许PC更新
         end 
         else begin

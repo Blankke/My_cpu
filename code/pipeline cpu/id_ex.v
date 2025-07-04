@@ -1,5 +1,5 @@
 module id_ex(
-    input clk, rst, pause, flush,
+    input clk, rst, flush,
 
     input id_RegWrite,
     input id_MemWrite,
@@ -34,7 +34,7 @@ module id_ex(
 );
 
 always @(posedge clk) begin
-    if(rst || pause || flush)begin
+    if(rst  || flush)begin
         ex_ALUop = 5'b00000;
         ex_ALUsrc = 1'b0;
         ex_GPRSel = 2'b00;
