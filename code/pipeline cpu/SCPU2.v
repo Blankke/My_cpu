@@ -19,72 +19,36 @@ module SCPU2(
     output [2:0] DMType
 );
 
-    // ????????????
-    wire [63:0] IF_ID_in;
-    wire [63:0] IF_ID_out;
-    wire [160:0] ID_EX_in;
-    wire [160:0] ID_EX_out;
-    wire [110:0] EX_MEM_in;
-    wire [110:0] EX_MEM_out;
-    wire [103:0] MEM_WB_in;
-    wire [103:0] MEM_WB_out;
-
-    wire IF_ID_write_enable;
-    wire IF_ID_flush;
-    wire ID_EX_write_enable = 1'b1;  
-    wire EX_MEM_write_enable = 1'b1;  
-    wire MEM_WB_write_enable = 1'b1;  
-    reg [31:0] RF_WD;  // ????��???????????????
-    // ??????????????
-    GRE_array #(200) IF_ID (
-       .Clk(clk),
-       .Rst(reset),
-       .write_enable(IF_ID_write_enable),
+    // 流水线寄存器控制信号
+    wire IF_ID_write_enable;    //only if will be stalled
+    wire IF_ID_flush;   // id and ex will be flushed
+    wire ID_EX_flush;
+    reg [31:0] RF_WD;  // Data that will be written to the register file
+    
+    // 流水线寄存器实例化
+    // IF/ID 流水线寄存器
+    wire [31:0] IF_ID_PC, IF_ID_inst; 
+    if_id u_if_id (
+       .clk(clk),
+       .rst(reset),
+       .pause(~IF_ID_write_enable),
        .flush(IF_ID_flush),
-       .in(IF_ID_in),
-       .out(IF_ID_out)
-    );
-
-    GRE_array #(200) ID_EX (
-       .Clk(clk),
-       .Rst(reset),
-       .write_enable(ID_EX_write_enable),
-       .flush(ID_EX_flush),
-       .in(ID_EX_in),
-       .out(ID_EX_out)
-    );
-
-    GRE_array #(200) EX_MEM (
-       .Clk(clk),
-       .Rst(reset),
-       .write_enable(EX_MEM_write_enable),
-       .flush(1'b0),
-       .in(EX_MEM_in),
-       .out(EX_MEM_out)
-    );
-
-    GRE_array #(200) MEM_WB (
-       .Clk(clk),
-       .Rst(reset),
-       .write_enable(MEM_WB_write_enable),
-       .flush(1'b0),
-       .in(MEM_WB_in),
-       .out(MEM_WB_out)
+       .if_pc(PC_out),
+       .if_instr(inst_in),
+       .id_pc(IF_ID_PC),
+       .id_instr(IF_ID_inst)
     );
 
     wire PCWrite;
-    // IF???
-//    ????????
-    // ID???
-    wire [31:0] IF_ID_PC = IF_ID_out[63:32];
-    wire [31:0] IF_ID_inst = IF_ID_out[31:0];
+    // ID stage
+    //instruction fields
     wire [6:0] Op = IF_ID_inst[6:0];
     wire [2:0] Funct3 = IF_ID_inst[14:12];
     wire [6:0] Funct7 = IF_ID_inst[31:25];
     wire [4:0] rs1 = IF_ID_inst[19:15];
     wire [4:0] rs2 = IF_ID_inst[24:20];
     wire [4:0] rd = IF_ID_inst[11:7];
-    // ?????????
+    // immediate extension
     wire [31:0] immout;
     wire [4:0] iimm_shamt;
 	wire [11:0] iimm,simm,bimm;
@@ -95,58 +59,46 @@ module SCPU2(
 	assign bimm={IF_ID_inst[31],IF_ID_inst[7],IF_ID_inst[30:25],IF_ID_inst[11:8]};
 	assign uimm=IF_ID_inst[31:12];
 	assign jimm={IF_ID_inst[31],IF_ID_inst[19:12],IF_ID_inst[20],IF_ID_inst[30:21]};
-    // EX???
-   
-    wire [31:0] aluout_EX;
-    wire Zero_EX;
-    wire RegWrite_EX = ID_EX_out[160];
-    wire MemWrite_EX = ID_EX_out[159];
-    wire [4:0] ALUOp_EX = ID_EX_out[158:154];
-    wire ALUSrc_EX = ID_EX_out[153];
-    wire [1:0] GPRSel_EX = ID_EX_out[152:151];
-    wire [1:0] WDSel_EX = ID_EX_out[150:149];
-    wire [2:0] DMType_EX = ID_EX_out[148:146];
-    wire [2:0] NPCOp_EX = {ID_EX_out[145:144],ID_EX_out[143]&Zero_EX};
-    wire [31:0] RD1_EX = ID_EX_out[142:111];
-    wire [31:0] RD2_EX = ID_EX_out[110:79];
-    wire [31:0] immout_EX = ID_EX_out[78:47];
-    wire [4:0] rs1_EX = ID_EX_out[46:42];
-    wire [4:0] rs2_EX = ID_EX_out[41:37];
-    wire [4:0] rd_EX = ID_EX_out[36:32];
-    wire [31:0] PC_EX = ID_EX_out[31:0];
+    
+    // EX stage
+    wire [31:0] aluout_EX;  //result from ALU first come out in ex stage
+    wire Zero_EX;    //same as above
+    // ID_EX 
+    wire RegWrite_EX, MemWrite_EX, ALUSrc_EX;  //stored in ID_EX register
+    wire [4:0] ALUOp_EX;     //stored in ID_EX register,used in alu
+    wire [1:0] GPRSel_EX, WDSel_EX;     //used later in WB stage
+    wire [2:0] DMType_EX, NPCOp_EX_temp; //used in NPC and data memory
+    // use the tmp wire to avoid the Zero_EX signal
+    // 0: PC + 4, 1: Branch target address, 2: Jump address, 3: JALR address
+
+    wire [2:0] NPCOp_EX = {NPCOp_EX_temp[2:1], NPCOp_EX_temp[0] & Zero_EX};   
+    wire [31:0] RD1_EX, RD2_EX, immout_EX, PC_EX; //stored in ID_EX register used in alu or detect hazard
+    wire [4:0] rs1_EX, rs2_EX, rd_EX;
     wire [31:0] NPC; 
     
-    // MEM???
-    wire [31:0] PC_MEM = EX_MEM_out[109:78];
-    wire RegWrite_MEM = EX_MEM_out[77];
-    wire MemWrite_MEM = EX_MEM_out[76];
-    wire [1:0] WDSel_MEM = EX_MEM_out[75:74];
-    wire [1:0] GPRSel_MEM = EX_MEM_out[73:72];
-    wire [2:0] DMType_MEM = EX_MEM_out[71:69];
-    wire [31:0] aluout_MEM = EX_MEM_out[68:37];
-    wire [31:0] RD2_MEM = EX_MEM_out[36:5];
-    wire [4:0] rd_MEM = EX_MEM_out[4:0];
+    // EX/MEM 流水线寄存器信号
+    wire RegWrite_MEM, MemWrite_MEM;  //used in data memory and WB stage
+    wire [1:0] WDSel_MEM, GPRSel_MEM;  //used in WB stage
+    wire [2:0] DMType_MEM;
+    wire [31:0] aluout_MEM, RD2_MEM, PC_MEM;
+    wire [4:0] rd_MEM;
 
     assign Addr_out = aluout_MEM;
     assign Data_out = RD2_MEM;
     assign mem_w = MemWrite_MEM;
     assign DMType = DMType_MEM;
     
-    //WB???
-    wire [31:0]PC_WB=MEM_WB_out[103:72];
-    wire RegWrite_WB=MEM_WB_out[71];
-    wire [1:0] WDSel_WB=MEM_WB_out[70:69];
-    wire [31:0] Data_in_WB=MEM_WB_out[68:37];
-    wire [31:0] aluout_WB=MEM_WB_out[36:5];
-    wire [4:0] rd_WB=MEM_WB_out[4:0];
+    // MEM/WB 流水线寄存器信号
+    wire RegWrite_WB;
+    wire [1:0] WDSel_WB;
+    wire [31:0] Data_in_WB, aluout_WB, PC_WB;
+    wire [4:0] rd_WB;
     PC u_PC (
        .clk(clk),
        .rst(reset),
        .NPC(NPC),
        .PC(PC_out)
     );
-
-    assign IF_ID_in = {PC_out, inst_in};
 
 
 
@@ -184,23 +136,56 @@ module SCPU2(
 		.EXTOp(EXTOp), .immout(immout)
 	);
 
-    // ????????
+    // 寄存器堆
     wire [31:0] RD1, RD2;
     RF1 u_RF (
        .clk(clk),
        .rst(reset),
-       .RFWr(RegWrite_WB),  // MEM/WB??��?��???
+       .RFWr(RegWrite_WB),
        .A1(rs1),
        .A2(rs2),
-       .A3(rd_WB),  // MEM/WB??��???????????
-       .WD(RF_WD),  // ��???????????????
+       .A3(rd_WB),
+       .WD(RF_WD),
        .RD1(RD1),
        .RD2(RD2)
     );
 
-    // ???ID????????ID_EX??????????
-    assign ID_EX_in = {RegWrite, MemWrite, ALUOp, ALUSrc, GPRSel, WDSel, DMType_ID, NPCOp, 
-                              RD1, RD2, immout, rs1, rs2, rd, IF_ID_PC};
+    // ID/EX 流水线寄存器
+    id_ex u_id_ex (
+       .clk(clk),
+       .rst(reset),
+       .flush(ID_EX_flush),
+       .id_RegWrite(RegWrite),
+       .id_MemWrite(MemWrite),
+       .id_ALUop(ALUOp),
+       .id_ALUsrc(ALUSrc),
+       .id_GPRSel(GPRSel),
+       .id_WDsel(WDSel),
+       .id_DMType(DMType_ID),
+       .id_NPCOp(NPCOp),
+       .id_RD1(RD1),
+       .id_RD2(RD2),
+       .id_immout(immout),
+       .id_rs1(rs1),
+       .id_rs2(rs2),
+       .id_rd(rd),
+       .id_PC(IF_ID_PC),
+       .ex_RegWrite(RegWrite_EX),
+       .ex_MemWrite(MemWrite_EX),
+       .ex_ALUop(ALUOp_EX),
+       .ex_ALUsrc(ALUSrc_EX),
+       .ex_GPRSel(GPRSel_EX),
+       .ex_WDsel(WDSel_EX),
+       .ex_DMType(DMType_EX),
+       .ex_NPCOp(NPCOp_EX_temp),
+       .ex_RD1(RD1_EX),
+       .ex_RD2(RD2_EX),
+       .ex_immout(immout_EX),
+       .ex_rs1(rs1_EX),
+       .ex_rs2(rs2_EX),
+       .ex_rd(rd_EX),
+       .ex_PC(PC_EX)
+    );
     HazardDetectionUnit u_hazard (
        .IF_ID_rs1(rs1),
        .IF_ID_rs2(rs2),
@@ -211,9 +196,9 @@ module SCPU2(
        .IF_ID_flush(IF_ID_flush),
        .PCWrite(PCWrite)
     );
-    // ???????????????ID_EX_flush???
+    // 冲突检测和控制信号
+    wire stall_signal;
     wire Branch_or_Jump = |NPCOp_EX;
-//    wire stall_signal = 1'b0;  // ?????????????????????????????
     assign ID_EX_flush = stall_signal | Branch_or_Jump;
     assign IF_ID_write_enable = ~stall_signal;
 
@@ -232,6 +217,9 @@ module SCPU2(
        .ForwardB(ForwardB)
     );
 
+
+//forwarding
+    // Forwarding logic for RD1 and RD2
     wire [31:0] RD1_forwarded = (ForwardA == 2'b00)? RD1_EX :
                                 (ForwardA == 2'b01)? RF_WD:
                                 (ForwardA == 2'b10)? aluout_MEM : 32'b0;
@@ -249,8 +237,7 @@ module SCPU2(
        .PC(PC_EX)
     );
 
-    // ??????????????????????PC_next
-//    wire PCSrc = Branch_or_Jump && Zero_EX;
+    // 下一个PC的计算
     NPC1 u_NPC (
        .PC(PC_out),
        .PC_EX(PC_EX),
@@ -261,16 +248,52 @@ module SCPU2(
        .aluout(aluout_EX)
     );
 
-    // ???EX????????EX_MEM??????????
-    assign EX_MEM_in = {PC_EX,RegWrite_EX, MemWrite_EX, WDSel_EX, GPRSel_EX, DMType_EX, aluout_EX, RD2_forwarded, rd_EX};
+    // EX/MEM 流水线寄存器
+    ex_mem u_ex_mem (
+       .clk(clk),
+       .rst(reset),
+       .flush(1'b0),
+       .ex_PC(PC_EX),
+       .ex_RegWrite(RegWrite_EX),
+       .ex_MemWrite(MemWrite_EX),
+       .ex_WDsel(WDSel_EX),
+       .ex_GPRSel(GPRSel_EX),
+       .ex_DMType(DMType_EX),
+       .ex_aluout(aluout_EX),
+       .ex_RD2(RD2_forwarded),
+       .ex_rd(rd_EX),
+       .me_RegWrite(RegWrite_MEM),
+       .me_MemWrite(MemWrite_MEM),
+       .me_WDsel(WDSel_MEM),
+       .me_GPRSel(GPRSel_MEM),
+       .me_DMType(DMType_MEM),
+       .me_aluout(aluout_MEM),
+       .me_RD2(RD2_MEM),
+       .me_rd(rd_MEM),
+       .me_PC(PC_MEM)
+    );
 
-    // ???MEM????????MEM_WB??????????
-    assign MEM_WB_in = {PC_MEM,RegWrite_MEM, WDSel_MEM, Data_in, aluout_MEM, rd_MEM};
+    // MEM/WB 流水线寄存器
+    mem_wb u_mem_wb (
+       .clk(clk),
+       .rst(reset),
+       .mem_PC(PC_MEM),
+       .mem_RegWrite(RegWrite_MEM),
+       .mem_WDsel(WDSel_MEM),
+       .mem_Datain(Data_in),
+       .mem_aluout(aluout_MEM),
+       .mem_rd(rd_MEM),
+       .wb_RegWrite(RegWrite_WB),
+       .wb_WDsel(WDSel_WB),
+       .wb_Datain(Data_in_WB),
+       .wb_aluout(aluout_WB),
+       .wb_rd(rd_WB),
+       .wb_PC(PC_WB)
+    );
 
-    // WB???
-
+    // WB阶段 - 写回数据选择
     always @(*) begin
-        case(WDSel_WB)  // WDSel???
+        case(WDSel_WB)
             `WDSel_FromALU: RF_WD = aluout_WB;
             `WDSel_FromMEM: RF_WD = Data_in_WB;
             `WDSel_FromPC:  RF_WD = PC_WB + 4;

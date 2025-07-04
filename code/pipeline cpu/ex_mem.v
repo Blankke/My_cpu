@@ -1,4 +1,4 @@
-module ex_me(
+module ex_mem(
     input clk, rst, flush,
     input [31:0]ex_PC,
     input ex_RegWrite,

@@ -84,6 +84,10 @@ module ctrl1(Op, Funct7, Funct3, Zero,
  //jalr
 	wire i_jalr =Op[6]&Op[5]&~Op[4]&~Op[3]&Op[2]&Op[1]&Op[0]& ~Funct3[2]& ~Funct3[1]&~Funct3[0];//jalr 1100111
    
+  //ecall
+    wire i_ecall = Op[6]&~Op[5]&~Op[4]&~Op[3]&~Op[2]&~Op[1]&Op[0]; // ecall 1110011
+    wire i_ebreak = Op[6]&~Op[5]&~Op[4]&~Op[3]&~Op[2]&Op[1]&Op[0]; // ebreak 1110011
+
 // //U type
 //  wire u_auipc = ~Op[6] & ~Op[5] & Op[4] & ~Op[3] & Op[2] & Op[1] & Op[0];  //op=0010111
 //  wire u_lui = ~Op[6] & Op[5] & Op[4] & ~Op[3] & Op[2] & Op[1] & Op[0];  //op=0110111
@@ -145,5 +149,6 @@ assign ALUOp[4] = i_srl | i_srli | i_sra | i_srai;
   assign DMType[2] = i_lbu;
   assign DMType[1] = i_lb | i_sb | i_lhu;
   assign DMType[0] = i_lh | i_sh | i_lb | i_sb;
+
 
 endmodule

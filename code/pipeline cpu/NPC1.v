@@ -15,19 +15,19 @@ module NPC1 (PC,PC_EX, NPCOp, IMM, NPC,aluout,PCWrite);  // next pc module
 	input PCWrite;
    output reg [31:0] NPC;   // next pc
    
-   wire [31:0] PCPLUS4;
+   wire [31:0] PC_4;
    
-   assign PCPLUS4 = PC + 4; // pc + 4
+   assign PC_4 = PC + 4; // pc + 4
    
    always @(*) begin
       if(PCWrite)
       begin
           case (NPCOp)
-              `NPC_PLUS4:  NPC = PCPLUS4;
+              `NPC_PLUS4:  NPC = PC_4;
               `NPC_BRANCH: NPC = PC_EX+IMM;
               `NPC_JUMP:   NPC = PC_EX+IMM;
               `NPC_JALR:	NPC =aluout;
-              default:     NPC = PCPLUS4;
+              default:     NPC = PC_4;
           endcase
       end
       else NPC=PC;
