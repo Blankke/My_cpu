@@ -83,6 +83,7 @@ module ctrl1(Op, Funct7, Funct3, Zero,
    	
  //jalr
 	wire i_jalr =Op[6]&Op[5]&~Op[4]&~Op[3]&Op[2]&Op[1]&Op[0]& ~Funct3[2]& ~Funct3[1]&~Funct3[0];//jalr 1100111
+
    
 // //U type
 //  wire u_auipc = ~Op[6] & ~Op[5] & Op[4] & ~Op[3] & Op[2] & Op[1] & Op[0];  //op=0010111
@@ -121,7 +122,6 @@ module ctrl1(Op, Funct7, Funct3, Zero,
   // NPC_BRANCH  3'b001
   // NPC_JUMP    3'b010
   // NPC_JALR	3'b100
-//  assign NPCOp[0] = sbtype & Zero;  
   assign NPCOp[0] = sbtype;
   assign NPCOp[1] = i_jal;
   assign NPCOp[2] = i_jalr;

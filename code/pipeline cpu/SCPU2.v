@@ -5,7 +5,7 @@ module SCPU2(
     input      reset,          // reset
     input [31:0]  inst_in,     // instruction
     input [31:0]  Data_in,     // data from data memory
-    input INT,
+    input INT,                 // external interrupt signal
     input MIO_ready,
     output    mem_w,          // output: memory write signal
     output [31:0] PC_out,     // PC address
@@ -19,11 +19,30 @@ module SCPU2(
     output [2:0] DMType
 );
 
+    // Exception/Interrupt handling registers
+    reg [31:0] SEPC;          // Saved Exception Program Counter
+    reg [7:0] STATUS;         // Status register
+    reg [7:0] INTMASK;        // Interrupt mask register
+    
+    // Exception/Interrupt control signals
+    wire ECALL;               // ECALL instruction signal
+    wire MRET;                // MRET instruction signal  
+    wire [7:0] SCAUSE_internal; // Exception cause from exception detection unit
+    wire [7:0] SCAUSE_final;  // Final exception cause including external interrupts
+    wire INT_Signal_internal; // Internal interrupt signal from exception detection unit
+    wire INT_Signal_final;    // Final interrupt signal
+    wire EXL_Set;             // Exception level set signal
+    wire [2:0] INT_PEND;      // Interrupt pending signal
+    
+    // External interrupt cause generation
+    assign SCAUSE_final = INT ? 8'b10000000 : SCAUSE_internal; // External interrupt has highest priority
+    assign INT_Signal_final = INT | INT_Signal_internal; // Combined interrupt signal
+
     // ????????????
     wire [63:0] IF_ID_in;
     wire [63:0] IF_ID_out;
-    wire [160:0] ID_EX_in;
-    wire [160:0] ID_EX_out;
+    wire [161:0] ID_EX_in;    // 原来是160:0，现在增加1位
+    wire [161:0] ID_EX_out;   // 原来是160:0，现在增加1位
     wire [110:0] EX_MEM_in;
     wire [110:0] EX_MEM_out;
     wire [103:0] MEM_WB_in;
@@ -99,21 +118,22 @@ module SCPU2(
    
     wire [31:0] aluout_EX;
     wire Zero_EX;
-    wire RegWrite_EX = ID_EX_out[160];
-    wire MemWrite_EX = ID_EX_out[159];
-    wire [4:0] ALUOp_EX = ID_EX_out[158:154];
-    wire ALUSrc_EX = ID_EX_out[153];
-    wire [1:0] GPRSel_EX = ID_EX_out[152:151];
-    wire [1:0] WDSel_EX = ID_EX_out[150:149];
-    wire [2:0] DMType_EX = ID_EX_out[148:146];
-    wire [2:0] NPCOp_EX = {ID_EX_out[145:144],ID_EX_out[143]&Zero_EX};
-    wire [31:0] RD1_EX = ID_EX_out[142:111];
-    wire [31:0] RD2_EX = ID_EX_out[110:79];
-    wire [31:0] immout_EX = ID_EX_out[78:47];
-    wire [4:0] rs1_EX = ID_EX_out[46:42];
-    wire [4:0] rs2_EX = ID_EX_out[41:37];
-    wire [4:0] rd_EX = ID_EX_out[36:32];
-    wire [31:0] PC_EX = ID_EX_out[31:0];
+    wire RegWrite_EX = ID_EX_out[161];      // 原来是160，现在加1
+    wire MemWrite_EX = ID_EX_out[160];      // 原来是159，现在加1
+    wire [4:0] ALUOp_EX = ID_EX_out[159:155]; // 原来是158:154，现在加1
+    wire ALUSrc_EX = ID_EX_out[154];        // 原来是153，现在加1
+    wire [1:0] GPRSel_EX = ID_EX_out[153:152]; // 原来是152:151，现在加1
+    wire [1:0] WDSel_EX = ID_EX_out[151:150];  // 原来是150:149，现在加1
+    wire [2:0] DMType_EX = ID_EX_out[149:147]; // 原来是148:146，现在加1
+    wire [2:0] NPCOp_EX = {ID_EX_out[146:145],ID_EX_out[144]&Zero_EX}; // 原来是145:144,143，现在加1
+    wire [31:0] RD1_EX = ID_EX_out[143:112]; // 原来是142:111，现在加1
+    wire [31:0] RD2_EX = ID_EX_out[111:80];  // 原来是110:79，现在加1
+    wire [31:0] immout_EX = ID_EX_out[79:48]; // 原来是78:47，现在加1
+    wire [4:0] rs1_EX = ID_EX_out[47:43];    // 原来是46:42，现在加1
+    wire [4:0] rs2_EX = ID_EX_out[42:38];    // 原来是41:37，现在加1
+    wire [4:0] rd_EX = ID_EX_out[37:33];     // 原来是36:32，现在加1
+    wire [31:0] PC_EX = ID_EX_out[32:1];     // 原来是31:0，现在加1
+    wire MRET_EX = ID_EX_out[0];             // 新添加的MRET信号
     wire [31:0] NPC; 
     
     // MEM???
@@ -178,6 +198,33 @@ module SCPU2(
     );
 
 
+    // 生成valid_inst信号，用于指示指令是否为已知的合法指令
+    wire valid_inst = RegWrite | MemWrite | |NPCOp | |ALUOp | |EXTOp;
+    
+    // Exception Detection Unit
+    ExceptionDetectionUnit u_exception_detect (
+       .instruction(IF_ID_inst),
+       .PC(IF_ID_PC),
+       .Op(Op),
+       .Funct7(Funct7),
+       .Funct3(Funct3),
+       .valid_inst(valid_inst),
+       .SCAUSE(SCAUSE_internal),
+       .INT_Signal(INT_Signal_internal),
+       .ECALL(ECALL),
+       .MRET(MRET)
+    );
+
+    // Exception Unit
+    ExceptionUnit u_exception (
+       .STATUS(STATUS),
+       .EX_SCAUSE(SCAUSE_final),
+       .INTMASK(INTMASK),
+       .EXL_Set(EXL_Set),
+       .INT_Signal(INT_Signal_final),
+       .INT_PEND(INT_PEND)
+    );
+
  	EXT1 u_EXT(
 		.iimm_shamt(iimm_shamt), .iimm(iimm), .simm(simm), .bimm(bimm),
 		.uimm(uimm), .jimm(jimm),
@@ -200,7 +247,7 @@ module SCPU2(
 
     // ???ID????????ID_EX??????????
     assign ID_EX_in = {RegWrite, MemWrite, ALUOp, ALUSrc, GPRSel, WDSel, DMType_ID, NPCOp, 
-                              RD1, RD2, immout, rs1, rs2, rd, IF_ID_PC};
+                              RD1, RD2, immout, rs1, rs2, rd, IF_ID_PC, MRET}; // 添加MRET信号
     HazardDetectionUnit u_hazard (
        .IF_ID_rs1(rs1),
        .IF_ID_rs2(rs2),
@@ -214,7 +261,6 @@ module SCPU2(
     // ???????????????ID_EX_flush???
     wire Branch_or_Jump = |NPCOp_EX;
 //    wire stall_signal = 1'b0;  // ?????????????????????????????
-    assign ID_EX_flush = stall_signal | Branch_or_Jump;
     assign IF_ID_write_enable = ~stall_signal;
 
     
@@ -251,6 +297,7 @@ module SCPU2(
 
     // ??????????????????????PC_next
 //    wire PCSrc = Branch_or_Jump && Zero_EX;
+    
     NPC1 u_NPC (
        .PC(PC_out),
        .PC_EX(PC_EX),
@@ -258,7 +305,12 @@ module SCPU2(
        .IMM(immout_EX),
        .NPC(NPC),
        .PCWrite(PCWrite),
-       .aluout(aluout_EX)
+       .aluout(aluout_EX),
+       .INT_Signal(INT_Signal_final),
+       .EXL_set(EXL_Set),
+       .INT_PEND(INT_PEND),
+       .SEPC(SEPC),
+       .MRET(MRET_EX)  // 使用EX阶段的MRET信号
     );
 
     // ???EX????????EX_MEM??????????
@@ -268,6 +320,30 @@ module SCPU2(
     assign MEM_WB_in = {PC_MEM,RegWrite_MEM, WDSel_MEM, Data_in, aluout_MEM, rd_MEM};
 
     // WB???
+
+    // Exception/Interrupt handling logic
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            SEPC <= 32'b0;
+            STATUS <= 8'b00000001; // IE = 1, EXL = 0 initially
+            INTMASK <= 8'b11111111; // All interrupts enabled by default
+        end
+        else begin
+            // Handle interrupt entry
+            if (INT_Signal_final && !STATUS[1]) begin // Only if not already in exception level
+                SEPC <= PC_EX;  // Save current PC in EX stage
+                STATUS[1] <= 1'b1;  // Set EXL bit to 1 (entering exception level)
+            end
+            // Handle MRET instruction - 使用EX阶段的MRET_EX信号
+            else if (MRET_EX && STATUS[1]) begin // Only if in exception level
+                STATUS[1] <= 1'b0;  // Clear EXL bit (leaving exception level) 
+            end
+        end
+    end
+    
+    // Pipeline flush control for interrupts
+    wire interrupt_flush = INT_Signal_final && !STATUS[1];
+    assign ID_EX_flush = stall_signal | Branch_or_Jump | interrupt_flush;
 
     always @(*) begin
         case(WDSel_WB)  // WDSel???

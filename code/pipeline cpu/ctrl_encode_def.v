@@ -3,6 +3,11 @@
 `define NPC_BRANCH  3'b001
 `define NPC_JUMP    3'b010
 `define NPC_JALR 3'b100
+`define NPC_INTERRUPT 3'b101
+`define NPC_MRET 3'b111
+
+// Exception/Interrupt related defines
+`define INTERRUPT_VECTOR 32'h40000000  // Interrupt vector base address
 
 // ALU control signal
 `define ALU_NOP   3'b000 
