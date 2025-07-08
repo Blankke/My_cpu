@@ -157,7 +157,7 @@ wire i_nop = ~Op[6] & ~Op[5] & ~Op[4] & ~Op[3] & ~Op[2] & ~Op[1] & ~Op[0]; // no
   // NPC_JUMP    3'b010
   // NPC_JALR	3'b100
 //  assign NPCOp[0] = sbtype & Zero;  
-  assign NPCOp[0] = sbtype |INT_Signal;
+  assign NPCOp[0] = sbtype;
   assign NPCOp[1] = i_jal |INT_Signal;
   assign NPCOp[2] = i_jalr |INT_Signal;
   

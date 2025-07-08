@@ -122,58 +122,66 @@ module SCPU2(
    
     wire [31:0] aluout_EX;
     wire Zero_EX;
-    wire RegWrite_EX = ID_EX_out[172];
-    wire MemWrite_EX = ID_EX_out[171];
-    wire [4:0] ALUOp_EX = ID_EX_out[170:166];
-    wire ALUSrc_EX = ID_EX_out[165];
-    wire [1:0] GPRSel_EX = ID_EX_out[164:163];
-    wire [1:0] WDSel_EX = ID_EX_out[162:161];
-    wire [2:0] DMType_EX = ID_EX_out[160:158];
-    wire [2:0] NPCOp_EX = {ID_EX_out[157:156],ID_EX_out[155]&Zero_EX};
-    wire [31:0] RD1_EX = ID_EX_out[154:123];
-    wire [31:0] RD2_EX = ID_EX_out[122:91];
-    wire [31:0] immout_EX = ID_EX_out[90:59];
-    wire [4:0] rs1_EX = ID_EX_out[58:54];
-    wire [4:0] rs2_EX = ID_EX_out[53:49];
-    wire [4:0] rd_EX = ID_EX_out[48:44];
-    wire [31:0] PC_EX = ID_EX_out[43:12];
-    // 从ID_EX寄存器高位提取异常处理信号
-    assign SCAUSE_EX = ID_EX_out[11:4];
-    assign INT_Signal_EX = ID_EX_out[3];
-    assign MRET_EX = ID_EX_out[2];
-    assign CSRRS_EX = ID_EX_out[1];
+
+    assign SCAUSE_EX = ID_EX_out[171:164];
+    assign INT_Signal_EX = ID_EX_out[163];
+    assign MRET_EX = ID_EX_out[162];
+    assign CSRRS_EX = ID_EX_out[161];
+    wire RegWrite_EX = ID_EX_out[160];
+    wire MemWrite_EX = ID_EX_out[159];
+    wire [4:0] ALUOp_EX = ID_EX_out[158:154];
+    wire ALUSrc_EX = ID_EX_out[153];
+    wire [1:0] GPRSel_EX = ID_EX_out[152:151];
+    wire [1:0] WDSel_EX = ID_EX_out[150:149];
+    wire [2:0] DMType_EX = ID_EX_out[148:146];
+    wire [2:0] NPCOp_EX = {ID_EX_out[145:144],ID_EX_out[143]&Zero_EX};
+    wire [31:0] RD1_EX = ID_EX_out[142:111];
+    wire [31:0] RD2_EX = ID_EX_out[110:79];
+    wire [31:0] immout_EX = ID_EX_out[78:47];
+    wire [4:0] rs1_EX = ID_EX_out[46:42];
+    wire [4:0] rs2_EX = ID_EX_out[41:37];
+    wire [4:0] rd_EX = ID_EX_out[36:32];
+    wire [31:0] PC_EX = ID_EX_out[31:0];
+
+     assign ID_EX_in = {SCAUSE_ID, INT_Signal_ID, MRET_ID, CSRRS_ID,RegWrite, MemWrite, ALUOp, ALUSrc, GPRSel, WDSel, DMType_ID, NPCOp, 
+                              RD1, RD2, immout, rs1, rs2, rd, IF_ID_PC};
+
     wire [31:0] NPC; 
     
     // MEM???
-    wire [31:0] PC_MEM = EX_MEM_out[121:90];
-    wire RegWrite_MEM = EX_MEM_out[89];
-    wire MemWrite_MEM = EX_MEM_out[88];
-    wire [1:0] WDSel_MEM = EX_MEM_out[87:86];
-    wire [1:0] GPRSel_MEM = EX_MEM_out[85:84];
-    wire [2:0] DMType_MEM = EX_MEM_out[83:81];
-    wire [31:0] aluout_MEM = EX_MEM_out[80:49];
-    wire [31:0] RD2_MEM = EX_MEM_out[48:17];
-    wire [4:0] rd_MEM = EX_MEM_out[16:12];
-    // 从EX_MEM寄存器高位提取异常处理信号
-    assign SCAUSE_MEM = EX_MEM_out[11:4];
-    assign INT_Signal_MEM = EX_MEM_out[3];
-    assign MRET_MEM = EX_MEM_out[2];
-    assign CSRRS_MEM = EX_MEM_out[1];
+    assign SCAUSE_MEM = EX_MEM_out[120:113];
+    assign INT_Signal_MEM = EX_MEM_out[112];
+    assign MRET_MEM = EX_MEM_out[111];
+    assign CSRRS_MEM = EX_MEM_out[110];
+    wire [31:0] PC_MEM = EX_MEM_out[109:78];
+    wire RegWrite_MEM = EX_MEM_out[77];
+    wire MemWrite_MEM = EX_MEM_out[76];
+    wire [1:0] WDSel_MEM = EX_MEM_out[75:74];
+    wire [1:0] GPRSel_MEM = EX_MEM_out[73:72];
+    wire [2:0] DMType_MEM = EX_MEM_out[71:69];
+    wire [31:0] aluout_MEM = EX_MEM_out[68:37];
+    wire [31:0] RD2_MEM = EX_MEM_out[36:5];
+    wire [4:0] rd_MEM = EX_MEM_out[4:0];
+
+    assign EX_MEM_in = {SCAUSE_EX,INT_Signal_EX,MRET_EX,CSRRS_EX,PC_EX,RegWrite_EX, MemWrite_EX, WDSel_EX, GPRSel_EX, DMType_EX, aluout_EX, RD2_forwarded, rd_EX};
+
 
     assign Addr_out = aluout_MEM;
     assign Data_out = RD2_MEM;
     assign mem_w = MemWrite_MEM;
     assign DMType = DMType_MEM;
     
-    //WB???
-    wire [31:0]PC_WB=MEM_WB_out[115:84];
-    wire RegWrite_WB=MEM_WB_out[83];
-    wire [1:0] WDSel_WB=MEM_WB_out[82:81];
-    wire [31:0] Data_in_WB=MEM_WB_out[80:49];
-    wire [31:0] aluout_WB=MEM_WB_out[48:17];
-    wire [4:0] rd_WB=MEM_WB_out[16:12];
-    // 从MEM_WB寄存器高位提取异常处理信号
-    assign SCAUSE_WB = MEM_WB_out[11:4];
+
+    assign SCAUSE_WB = MEM_WB_out[111:104];
+    wire [31:0]PC_WB=MEM_WB_out[103:72];
+    wire RegWrite_WB=MEM_WB_out[71];
+    wire [1:0] WDSel_WB=MEM_WB_out[70:69];
+    wire [31:0] Data_in_WB=MEM_WB_out[68:37];
+    wire [31:0] aluout_WB=MEM_WB_out[36:5];
+    wire [4:0] rd_WB=MEM_WB_out[4:0];
+
+    assign MEM_WB_in = {SCAUSE_MEM,PC_MEM,RegWrite_MEM, WDSel_MEM, Data_in, aluout_MEM, rd_MEM};
+
     PC1 u_PC (
        .clk(clk),
        .rst(reset),
@@ -242,9 +250,7 @@ module SCPU2(
     );
 
     // ???ID????????ID_EX??????????
-    assign ID_EX_in = {RegWrite, MemWrite, ALUOp, ALUSrc, GPRSel, WDSel, DMType_ID, NPCOp, 
-                              RD1, RD2, immout, rs1, rs2, rd, IF_ID_PC, SCAUSE_ID, INT_Signal_ID, MRET_ID, CSRRS_ID};
-    HazardDetectionUnit u_hazard (
+  HazardDetectionUnit u_hazard (
        .IF_ID_rs1(rs1),
        .IF_ID_rs2(rs2),
        .ID_EX_rd(rd_EX),
@@ -306,11 +312,6 @@ module SCPU2(
        .aluout(aluout_EX)
     );
     
-    // ???EX????????EX_MEM??????????
-    assign EX_MEM_in = {PC_EX,RegWrite_EX, MemWrite_EX, WDSel_EX, GPRSel_EX, DMType_EX, aluout_EX, RD2_forwarded, rd_EX};
-
-    // ???MEM????????MEM_WB??????????
-    assign MEM_WB_in = {PC_MEM,RegWrite_MEM, WDSel_MEM, Data_in, aluout_MEM, rd_MEM};
 
     // WB???
 

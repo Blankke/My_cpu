@@ -3,7 +3,7 @@
 `define NPC_BRANCH  3'b001
 `define NPC_JUMP    3'b010
 `define NPC_JALR 3'b100
-`define NPC_INT 3'b111 // Interrupt handling
+`define NPC_INT 3'b110 // Interrupt handling
 
 // ALU control signal
 `define ALU_NOP   3'b000 

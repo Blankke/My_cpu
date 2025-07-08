@@ -27,7 +27,7 @@ module NPC1 (PC,PC_EX, NPCOp, IMM, NPC,aluout,PCWrite,SEPC,MRET);  // next pc mo
             NPC = SEPC; // MRET指令时，使用SEPC作为下一条指令地址
          end
          else if(NPCOp == `NPC_INT) begin
-            NPC = 32'h80000000; // Interrupt handling
+            NPC = 32'h00000a74; // Interrupt handling
          end
          else  case (NPCOp)
               `NPC_PLUS4:  NPC = PCPLUS4;
