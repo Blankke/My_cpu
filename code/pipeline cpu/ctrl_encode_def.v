@@ -3,6 +3,7 @@
 `define NPC_BRANCH  3'b001
 `define NPC_JUMP    3'b010
 `define NPC_JALR 3'b100
+`define NPC_INT 3'b111 // Interrupt handling
 
 // ALU control signal
 `define ALU_NOP   3'b000 
@@ -44,6 +45,7 @@
 `define WDSel_FromALU 2'b00
 `define WDSel_FromMEM 2'b01
 `define WDSel_FromPC 2'b10
+`define WDSel_FromCSR 2'b11
 
 // ALUOp control signal
 `define ALUOp_nop 5'b00000

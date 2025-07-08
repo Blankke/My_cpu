@@ -1,12 +1,41 @@
 // `include "ctrl_encode_def.v"
 
 //123
-module ctrl1(Op, Funct7, Funct3, Zero, 
+module ctrl1(instruction,Op, Funct7, Funct3, Zero, 
             RegWrite, MemWrite,
             EXTOp, ALUOp, NPCOp, 
             ALUSrc, GPRSel, WDSel,DMType
+            , SCAUSE, INT_Signal,  MRET, CSRRS
             );
-            
+            input [31:0] instruction; // instruction
+  //about exception  
+  parameter ECALL_SCAUSE = 8'h08;           // Environment call
+  parameter ILLEGAL_INST_SCAUSE = 8'h02;    // Illegal instruction
+  parameter INST_ADDR_MISALIGN = 8'h00;     // Instruction address misaligned
+  parameter MRET_SCAUSE = 8'h00;            // MRET doesn't generate exception, just for detection
+
+  // ECALL和MRET指令识别
+  wire system_type = Op[6]&Op[5]&Op[4]&~Op[3]&~Op[2]&Op[1]&Op[0]; // 1110011
+  wire i_ecall = system_type & 
+              ~Funct3[2] & ~Funct3[1] & ~Funct3[0] & // funct3 = 000
+              ~instruction[19] & ~instruction[18] & ~instruction[17] & ~instruction[16] & ~instruction[15] & // rs1 = 00000
+              ~instruction[24] & ~instruction[23] & ~instruction[22] & ~instruction[21] & ~instruction[20] & // rs2 = 00000
+              ~Funct7[6] & ~Funct7[5] & ~Funct7[4] & ~Funct7[3] & ~Funct7[2] & ~Funct7[1] & ~Funct7[0]; // funct7 = 0000000
+
+  // MRET: opcode=1110011, funct3=000, imm[11:0]=001100000010 (0x302)
+  wire i_mret = system_type & 
+                ~Funct3[2] & ~Funct3[1] & ~Funct3[0] & // funct3 = 000
+                ~instruction[31] & ~instruction[30] & instruction[29] & instruction[28] & // imm[11:8] = 0011
+                ~instruction[27] & ~instruction[26] & ~instruction[25] & ~instruction[24] & // imm[7:4] = 0000  
+                ~instruction[23] & ~instruction[22] & instruction[21] & ~instruction[20]; // imm[3:0] = 0010
+
+  // CSRRS: opcode=1110011, funct3=010 (只检测读取scause的情况)
+  wire i_csrrs = system_type & 
+                  ~Funct3[2] & Funct3[1] & ~Funct3[0]; // funct3 = 010
+    
+
+
+
    input  [6:0] Op;       // opcode
    input  [6:0] Funct7;    // funct7
    input  [2:0] Funct3;    // funct3
@@ -22,7 +51,12 @@ module ctrl1(Op, Funct7, Funct3, Zero,
    output [1:0] GPRSel;   // general purpose register selection
    output [1:0] WDSel;    // (register) write data selection
    output [2:0] DMType;
-   
+   //new
+    output [7:0] SCAUSE;    // 异常原因码
+    output       INT_Signal;    // 中断信号
+
+    output       MRET;          // MRET指令检测
+    output       CSRRS;          // CSRRS指令检测
   // r format
     wire rtype  = ~Op[6]&Op[5]&Op[4]&~Op[3]&~Op[2]&Op[1]&Op[0]; //0110011
     wire i_add  = rtype& ~Funct7[6]&~Funct7[5]&~Funct7[4]&~Funct7[3]&~Funct7[2]&~Funct7[1]&~Funct7[0]&~Funct3[2]&~Funct3[1]&~Funct3[0]; // add 0000000 000
@@ -84,6 +118,7 @@ module ctrl1(Op, Funct7, Funct3, Zero,
  //jalr
 	wire i_jalr =Op[6]&Op[5]&~Op[4]&~Op[3]&Op[2]&Op[1]&Op[0]& ~Funct3[2]& ~Funct3[1]&~Funct3[0];//jalr 1100111
    
+wire i_nop = ~Op[6] & ~Op[5] & ~Op[4] & ~Op[3] & ~Op[2] & ~Op[1] & ~Op[0]; // nop 0000000
 // //U type
 //  wire u_auipc = ~Op[6] & ~Op[5] & Op[4] & ~Op[3] & Op[2] & Op[1] & Op[0];  //op=0010111
 //  wire u_lui = ~Op[6] & Op[5] & Op[4] & ~Op[3] & Op[2] & Op[1] & Op[0];  //op=0110111
@@ -114,17 +149,17 @@ module ctrl1(Op, Funct7, Funct3, Zero,
   // WDSel_FromALU 2'b00
   // WDSel_FromMEM 2'b01
   // WDSel_FromPC  2'b10 
-  assign WDSel[0] = itype_l;
-  assign WDSel[1] = i_jal | i_jalr;//|u_lui;not right
+  assign WDSel[0] = itype_l|i_csrrs;
+  assign WDSel[1] = i_jal | i_jalr |i_csrrs;//|u_lui;not right
 
   // NPC_PLUS4   3'b000
   // NPC_BRANCH  3'b001
   // NPC_JUMP    3'b010
   // NPC_JALR	3'b100
 //  assign NPCOp[0] = sbtype & Zero;  
-  assign NPCOp[0] = sbtype;
-  assign NPCOp[1] = i_jal;
-  assign NPCOp[2] = i_jalr;
+  assign NPCOp[0] = sbtype |INT_Signal;
+  assign NPCOp[1] = i_jal |INT_Signal;
+  assign NPCOp[2] = i_jalr |INT_Signal;
   
 
 
@@ -146,4 +181,17 @@ assign ALUOp[4] = i_srl | i_srli | i_sra | i_srai;
   assign DMType[1] = i_lb | i_sb | i_lhu;
   assign DMType[0] = i_lh | i_sh | i_lb | i_sb;
 
+wire illegal_instr =1'b0;
+  // wire illegal_instr= ~i_add & ~i_sub & ~i_or & ~i_and & ~i_xor & ~i_sll & ~i_srl & ~i_sra &
+  //                     ~i_slt & ~i_sltu & ~i_addi & ~i_andi & ~i_ori & ~i_xori & ~i_slli &
+  //                     ~i_srli & ~i_srai & ~i_slti & ~i_sltiu & ~i_lb & ~i_lbu & ~i_lh &
+  //                     ~i_lhu & ~i_lw & ~i_sw & ~i_sb & ~i_sh & ~i_beq & ~i_bne &
+  //                     ~i_bge & ~i_bgeu & ~i_blt & ~i_bltu & ~i_jal & ~i_jalr &
+  //                     ~i_auipc & ~i_lui & ~i_ecall & ~i_mret & ~i_csrrs & ~i_nop;
+  assign SCAUSE = 
+                illegal_instr ? ILLEGAL_INST_SCAUSE :
+                i_ecall ? ECALL_SCAUSE : 8'h00;
+  assign INT_Signal = i_ecall | illegal_instr; // 中断信号
+  assign MRET = i_mret; // MRET指令检测
+  assign CSRRS = i_csrrs; // CSRRS指令检测
 endmodule
