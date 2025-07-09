@@ -1,32 +1,33 @@
-# Exception Test Program in objdump format
-# This program demonstrates exception handling with ecall and illegal instruction
+# Enhanced Exception Test Program with Branch Handling
+# This program demonstrates exception handling with scause-based branching
+# RISC-V assembly in objdump format
 
-build/exception_test.bin:     file format binary
+build/exception_test_branch.bin:     file format binary
 
 Disassembly of section .data:
 
 0000000000000000 <.data>:
-   0:	10000093          	addi	x1,x0,256
-   4:	20000113          	addi	x2,x0,512
-   8:	002081b3          	add	x3,x1,x2
-   c:	40118233          	sub	x4,x3,x1
-  10:	0020e2b3          	or	x5,x1,x2
-  14:	0041f333          	and	x6,x3,x4
-  18:	00102023          	sw	x1,0(x0)
-  1c:	00202223          	sw	x2,4(x0)
-  20:	00302423          	sw	x3,8(x0)
-  24:	00002383          	lw	x7,0(x0)
-  28:	00402403          	lw	x8,4(x0)
-  2c:	00802483          	lw	x9,8(x0)
-  30:	00000073          	ecall
-  34:	11100513          	addi	x10,x0,273
-  38:	22200593          	addi	x11,x0,546
-  3c:	00b50633          	add	x12,x10,x11
-  40:	ffffffff          	.word	0xffffffff
-  44:	33300693          	addi	x13,x0,819
-  48:	44400713          	addi	x14,x0,1092
-  4c:	00e687b3          	add	x15,x13,x14
-  50:	a280006f          	j	0xa78
+   0:	10000093          	addi	x1,x0,256      # 初始化：x1 = 256
+   4:	20000113          	addi	x2,x0,512      # x2 = 512 (将用作栈指针基址)
+   8:	002081b3          	add	x3,x1,x2       # x3 = x1 + x2 = 768
+   c:	40118233          	sub	x4,x3,x1       # x4 = x3 - x1 = 512
+  10:	0020e2b3          	or	x5,x1,x2       # x5 = x1 | x2 = 768
+  14:	0041f333          	and	x6,x3,x4       # x6 = x3 & x4 = 512
+  18:	00102023          	sw	x1,0(x0)       # 存储x1到地址0
+  1c:	00202223          	sw	x2,4(x0)       # 存储x2到地址4
+  20:	00302423          	sw	x3,8(x0)       # 存储x3到地址8
+  24:	00002383          	lw	x7,0(x0)       # 从地址0加载到x7
+  28:	00402403          	lw	x8,4(x0)       # 从地址4加载到x8
+  2c:	00802483          	lw	x9,8(x0)       # 从地址8加载到x9
+  30:	00000073          	ecall              # 触发环境调用异常 (scause = 8)
+  34:	11100513          	addi	x10,x0,273     # ecall后继续：x10 = 273
+  38:	22200593          	addi	x11,x0,546     # x11 = 546
+  3c:	00b50633          	add	x12,x10,x11    # x12 = x10 + x11 = 819
+  40:	ffffffff          	.word	0xffffffff    # 非法指令触发异常 (scause = 2)
+  44:	 e0000237            lui tp,0xe0000
+  48:	 000072b7            lui t0,0x7
+  4c:	00522023            sw  t0,0(tp) 
+  50:	fb1ff06f          	j	0x0            # 跳转回程序开头
   54:	00000013          	nop
   58:	00000013          	nop
   5c:	00000013          	nop
@@ -676,22 +677,22 @@ Disassembly of section .data:
  a6c:	00000013          	nop
  a70:	00000013          	nop
  a74:	00000013          	nop
- a78:	0000006f          	j	0xa78
- a7c:	ff010113          	addi	x2,x2,-16
- a80:	00112023          	sw	x1,0(x2)
- a84:	00212223          	sw	x2,4(x2)
- a88:	00312423          	sw	x3,8(x2)
- a8c:	34202873          	csrrs	x16,mcause,x0
- a90:	01012623          	sw	x16,12(x2)
- a94:	00100893          	addi	x17,x0,1
- a98:	00812183          	lw	x3,8(x2)
- a9c:	00412103          	lw	x2,4(x2)
- aa0:	00012083          	lw	x1,0(x2)
- aa4:	01010113          	addi	x2,x2,16
- aa8:	30200073          	mret
- aac:	00000013          	nop
- ab0:	00000013          	nop
- ab4:	00000013          	nop
+ a78:	00000013          	nop
+ a7c:	ff010113          	addi	x2,x2,-16      # exception_handler: 通用异常处理入口
+ a80:	00112023          	sw	x1,0(x2)       # 保存上下文：x1
+ a84:	00512223          	sw	x5,4(x2)       # 保存上下文：x5
+ a88:	00612423          	sw	x6,8(x2)       # 保存上下文：x6
+ a8c:	00712623          	sw	x7,12(x2)      # 保存上下文：x7
+ a90:	e0000237            lui tp,0xe0000
+ a94:	000012b7            lui t0,0x1
+ a98:00522023            sw  t0,0(tp)
+ a9c:	00000013          	nop
+ aa0:	00000013          	nop
+ aa4:	00c12383          	lw	x7,12(x2)      # 未知异常：恢复上下文
+ aa8:	00812303          	lw	x6,8(x2)
+ aac:	00412283          	lw	x5,4(x2)
+ ab0:	00012083          	lw	x1,0(x2)
+ ab4:	10c0006f          	j	0xbc0           # 跳转到返回点
  ab8:	00000013          	nop
  abc:	00000013          	nop
  ac0:	00000013          	nop
@@ -699,3 +700,69 @@ Disassembly of section .data:
  ac8:	00000013          	nop
  acc:	00000013          	nop
  ad0:	00000013          	nop
+ ad4:	00000013          	nop
+ ad8:	00000013          	nop
+ adc:	00000013          	nop
+ ae0:	00000013          	nop
+ ae4:	00000013          	nop
+ ae8:	00000013          	nop
+ aec:	00000013          	nop
+ af0:	00000013          	nop
+ af4:	00000013          	nop
+ af8:	00000013          	nop
+ afc:	00000013          	nop
+ b00:	00000013          	nop
+ b04:	00000013          	nop
+ b08:	00000013          	nop
+ b0c:	00000013          	nop
+ b10:	00000013          	nop
+ b14:	00000013          	nop
+ b18:	00000013          	nop
+ b1c:	00000013          	nop
+ b20:	00000013          	nop
+ b24:	00000013          	nop
+ b28:	ff010113          	addi	x2,x2,-16      # ecall_branch: ecall异常处理分支
+ b2c:	00412023          	sw	x4,0(x2)       # 保存上下文：x4
+ b30:	00812223          	sw	x8,4(x2)       # 保存上下文：x8
+ b34:	00912423          	sw	x9,8(x2)       # 保存上下文：x9
+ b38:	01212623          	sw	x18,12(x2)     # 保存上下文：x18
+ b3c: e0000237            lui tp,0xe0000
+ b40: 000082b7            lui t0,0x8
+ b44:00522023            sw  t0,0(tp)
+ b48:	40820233          	sub	x4,x4,x8       # x4 = x4 - x8 = -256
+ b4c:	00926433          	or	x8,x4,x9       # x8 = x4 | x9
+ b50:	009244b3          	xor	x9,x4,x9       # x9 = x4 ^ x9
+ b54:	77700913          	addi	x18,x0,1911    # x18 = 1911
+ b58:	01248433          	add	x8,x9,x18      # x8 = x9 + x18
+ b5c:	01240233          	add	x4,x8,x18      # x4 = x8 + x18
+ b60:	00c12903          	lw	x18,12(x2)     # 恢复上下文：x18
+ b64:	00812483          	lw	x9,8(x2)       # 恢复上下文：x9
+ b68:	00412403          	lw	x8,4(x2)       # 恢复上下文：x8
+ b6c:	00012203          	lw	x4,0(x2)       # 恢复上下文：x4
+ b70:	01010113          	addi	x2,x2,16       # 恢复栈指针
+ b74:	04c0006f          	j	0xbc0           # 跳转到返回点
+ b78:	ff010113          	addi	x2,x2,-16      # illegal_branch: 非法指令异常处理分支
+ b7c:	00a12023          	sw	x10,0(x2)      # 保存上下文：x10
+ b80:	00b12223          	sw	x11,4(x2)      # 保存上下文：x11
+ b84:	00c12423          	sw	x12,8(x2)      # 保存上下文：x12
+ b88:	01312623          	sw	x19,12(x2)     # 保存上下文：x19
+ b8c:	e0000237            lui tp,0xe0000
+ b90:	000022b7           lui t0, 0x2
+ b94:	00522023            sw  t0,0(tp)
+ b98:	40c50533          	sub	x10,x10,x12    # x10 = x10 - x12 = -1092
+ b9c:	00c665b3          	or	x11,x12,x12    # x11 = x12 | x12 = 1911
+ ba0:	00c64633          	xor	x12,x12,x12    # x12 = x12 ^ x12 = 0
+ ba4:	88800993          	addi	x19,x0,-1896   # x19 = -1896
+ ba8:	0135a5b3          	slt	x11,x11,x19    # x11 = (x11 < x19) ? 1 : 0
+ bac:	01350533          	add	x10,x10,x19    # x10 = x10 + x19
+ bb0:	00c12983          	lw	x19,12(x2)     # 恢复上下文：x19
+ bb4:	00812603          	lw	x12,8(x2)      # 恢复上下文：x12
+ bb8:	00412583          	lw	x11,4(x2)      # 恢复上下文：x11
+ bbc:	00012503          	lw	x10,0(x2)      # 恢复上下文：x10
+ bc0:	01010113          	addi	x2,x2,16       # restore_point: 通用恢复点
+ bc4:	00c12383          	lw	x7,12(x2)      # 恢复主上下文：x7
+ bc8:	00812303          	lw	x6,8(x2)       # 恢复主上下文：x6
+ bcc:	00412283          	lw	x5,4(x2)       # 恢复主上下文：x5
+ bd0:	00012083          	lw	x1,0(x2)       # 恢复主上下文：x1
+ bd4:	01010113          	addi	x2,x2,16       # 恢复栈指针
+ bd8:	30200073          	mret               # 从异常返回

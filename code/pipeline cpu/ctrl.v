@@ -123,7 +123,7 @@ wire i_nop = ~Op[6] & ~Op[5] & ~Op[4] & ~Op[3] & ~Op[2] & ~Op[1] & ~Op[0]; // no
 //  wire u_auipc = ~Op[6] & ~Op[5] & Op[4] & ~Op[3] & Op[2] & Op[1] & Op[0];  //op=0010111
 //  wire u_lui = ~Op[6] & Op[5] & Op[4] & ~Op[3] & Op[2] & Op[1] & Op[0];  //op=0110111
   // generate control signals
-  assign RegWrite = rtype | itype_r | itype_l | i_auipc | i_lui | i_jalr | i_jal;  // register write
+  assign RegWrite = rtype | itype_r | itype_l | i_auipc | i_lui | i_jalr | i_jal | i_csrrs;  // register write
   assign MemWrite   = stype;                           // memory write
 //  assign ALUSrc     = itype_l |itype_r | stype | i_jal | i_jalr| i_auipc | i_lui ;   // ALU B is from instruction immediate
   assign ALUSrc     = itype_l |itype_r | stype | i_jalr| i_auipc | i_lui ;   // ALU B is from instruction immediate
@@ -181,13 +181,13 @@ assign ALUOp[4] = i_srl | i_srli | i_sra | i_srai;
   assign DMType[1] = i_lb | i_sb | i_lhu;
   assign DMType[0] = i_lh | i_sh | i_lb | i_sb;
 
-wire illegal_instr =1'b0;
-  // wire illegal_instr= ~i_add & ~i_sub & ~i_or & ~i_and & ~i_xor & ~i_sll & ~i_srl & ~i_sra &
-  //                     ~i_slt & ~i_sltu & ~i_addi & ~i_andi & ~i_ori & ~i_xori & ~i_slli &
-  //                     ~i_srli & ~i_srai & ~i_slti & ~i_sltiu & ~i_lb & ~i_lbu & ~i_lh &
-  //                     ~i_lhu & ~i_lw & ~i_sw & ~i_sb & ~i_sh & ~i_beq & ~i_bne &
-  //                     ~i_bge & ~i_bgeu & ~i_blt & ~i_bltu & ~i_jal & ~i_jalr &
-  //                     ~i_auipc & ~i_lui & ~i_ecall & ~i_mret & ~i_csrrs & ~i_nop;
+// wire illegal_instr =1'b0;
+  wire illegal_instr= ~i_add & ~i_sub & ~i_or & ~i_and & ~i_xor & ~i_sll & ~i_srl & ~i_sra &
+                      ~i_slt & ~i_sltu & ~i_addi & ~i_andi & ~i_ori & ~i_xori & ~i_slli &
+                      ~i_srli & ~i_srai & ~i_slti & ~i_sltiu & ~i_lb & ~i_lbu & ~i_lh &
+                      ~i_lhu & ~i_lw & ~i_sw & ~i_sb & ~i_sh & ~i_beq & ~i_bne &
+                      ~i_bge & ~i_bgeu & ~i_blt & ~i_bltu & ~i_jal & ~i_jalr &
+                      ~i_auipc & ~i_lui & ~i_ecall & ~i_mret & ~i_csrrs & ~i_nop;
   assign SCAUSE = 
                 illegal_instr ? ILLEGAL_INST_SCAUSE :
                 i_ecall ? ECALL_SCAUSE : 8'h00;

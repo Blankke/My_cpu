@@ -57,6 +57,7 @@ module SCPU2(
     reg [31:0] RF_WD;  
 
     reg [31:0] SEPC;
+    reg [31:0] SCAUSE_CSR;  // 专用的SCAUSE CSR寄存器，不会被流水线清空影响
 
 
     GRE_array #(200) IF_ID (
@@ -117,6 +118,8 @@ module SCPU2(
 	assign simm={IF_ID_inst[31:25],IF_ID_inst[11:7]};
 	assign bimm={IF_ID_inst[31],IF_ID_inst[7],IF_ID_inst[30:25],IF_ID_inst[11:8]};
 	assign uimm=IF_ID_inst[31:12];
+	// JAL immediate: imm[20|10:1|11|19:12] = inst[31|30:21|20|19:12]
+	// jimm[19:0] should represent imm[20:1] in proper order
 	assign jimm={IF_ID_inst[31],IF_ID_inst[19:12],IF_ID_inst[20],IF_ID_inst[30:21]};
     // EX???
    
@@ -124,7 +127,7 @@ module SCPU2(
     wire Zero_EX;
 
     assign SCAUSE_EX = ID_EX_out[171:164];
-    assign INT_Signal_EX = ID_EX_out[163];
+    assign INT_Signal_EX = ID_EX_out[163] | INT;
     assign MRET_EX = ID_EX_out[162];
     assign CSRRS_EX = ID_EX_out[161];
     wire RegWrite_EX = ID_EX_out[160];
@@ -309,22 +312,37 @@ module SCPU2(
        .MRET(MRET_EX),
        .NPC(NPC),
        .PCWrite(PCWrite),
-       .aluout(aluout_EX)
+       .aluout(aluout_EX),
+       .SCAUSE(SCAUSE_EX),
+
     );
     
 
     // WB???
+
+    always @(posedge clk or posedge reset) begin
+        if(reset) begin
+            SCAUSE_CSR <= 32'b0;
+            SEPC <= 32'b0;
+        end else begin
+            if(INT)
+            SCAUSE_CSR <= 32'h00000001; // 中断异常
+            // 当检测到异常/中断时，更新SCAUSE_CSR
+            if(INT_Signal_EX || (|SCAUSE_EX)) begin
+                    SCAUSE_CSR <= {24'b0, SCAUSE_EX};
+                SEPC <= PC_EX + 4; // 保存异常发生时的PC地址
+            end
+        end
+    end
 
     always @(*) begin
         case(WDSel_WB)  // WDSel???
             `WDSel_FromALU: RF_WD = aluout_WB;
             `WDSel_FromMEM: RF_WD = Data_in_WB;
             `WDSel_FromPC:  RF_WD = PC_WB + 4;
-            `WDSel_FromCSR: RF_WD = SCAUSE_WB; // CSR read data
+            `WDSel_FromCSR: RF_WD = SCAUSE_CSR; // 从专用CSR寄存器读取SCAUSE
             default: RF_WD = 32'b0;
         endcase
-        if(INT_Signal_EX)
-            SEPC = PC_EX; // 保存异常发生时的PC地址
     end
 
 
