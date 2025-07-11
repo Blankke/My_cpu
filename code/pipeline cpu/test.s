@@ -678,7 +678,7 @@ Disassembly of section .data:
  a70:	00000013          	nop
  a74:	00000013          	nop
  a78:	00000013          	nop
- a7c:	ff010113          	addi	x2,x2,-16      # exception_handler: 通用异常处理入口
+ a7c:	ff010113          	addi	x2,x2,-16      # exception_handler: 外部中断处理入口
  a80:	00112023          	sw	x1,0(x2)       # 保存上下文：x1
  a84:	00512223          	sw	x5,4(x2)       # 保存上下文：x5
  a88:	00612423          	sw	x6,8(x2)       # 保存上下文：x6

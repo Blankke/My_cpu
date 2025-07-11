@@ -2,11 +2,11 @@
 
 
 module ForwardingUnit(
-    input MEM_RegWrite,
-    input [4:0] MEM_rd,
-    input WB_RegWrite,
-    input [4:0] WB_rd,
-    input [4:0] EX_rs1,
+    input MEM_RegWrite, // Memory stage register write enable
+    input [4:0] MEM_rd, // Memory stage destination register
+    input WB_RegWrite, // Write-back stage register write enable 
+    input [4:0] WB_rd, // Write-back stage destination register
+    input [4:0] EX_rs1, // Execute stage source register 1
     input [4:0] EX_rs2,
     output [1:0] ForwardA,
     output [1:0] ForwardB

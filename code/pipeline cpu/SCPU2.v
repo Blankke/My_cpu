@@ -314,7 +314,7 @@ module SCPU2(
        .PCWrite(PCWrite),
        .aluout(aluout_EX),
        .SCAUSE(SCAUSE_EX),
-
+       .INT(INT)
     );
     
 
